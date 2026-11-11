@@ -1,4 +1,4 @@
-import { addBot, hide, holdReload, log, type Player, players } from 'modlock'
+import { abilityBarPresses, addBot, hide, holdReload, log, type Player, players } from 'modlock'
 
 import { Broker, setBrokerOpening } from './broker/broker'
 import { Draft, type Entrant, NO_SEAT, Phase, pickBoard, type Seat, type Spot } from './draft/draft'
@@ -16,7 +16,7 @@ import { LateArrivals } from './match/late'
 import { matchOver } from './match/over'
 import { connectedPeople, type HeroRead, HeroReads, playerAt } from './match/roster'
 import { KeyUpgrades } from './match/upgrades'
-import { showGameHud } from './ui/client'
+import { clearHidden, forgetHidden, showGameHud } from './ui/hud'
 import { Cues } from './ui/cues'
 import { TooltipHelpers } from './ui/helper'
 import { Painter } from './ui/painter'
@@ -45,9 +45,8 @@ enum Stage {
   Heroes = 'heroes',
   Playing = 'playing',
   /**
-   * From the game's end of the match until the next world: the client layout
-   * gives each person the game's HUD back, since the game's own lobby shows the
-   * same HUD and the layout does not run there.
+   * From the game's end of the match until the next world: each person gets
+   * the game's HUD back, since the game's own lobby shows the same HUD.
    */
   Over = 'over',
 }
@@ -99,14 +98,17 @@ export class Flow {
     this.nextBoard = undefined
     this.botsCalled = false
     this.painter.clear()
+    clearHidden()
+    this.upgrades.clear()
+    for (const c of players()) {
+      abilityBarPresses(c.player)
+    }
     this.heroAskedAt.clear()
     this.heroClickedAt.clear()
     this.room.clear()
     this.waitView.clear()
     this.tabSender.clear()
     this.broker.clear()
-    this.imbuing.clear()
-    this.upgrades.clear()
     this.reads.clear()
     this.lateArrivals.clear()
     this.bought.clear()
@@ -181,14 +183,14 @@ export class Flow {
 
   buyImbuingItem(player: Player, args: string): void {
     if (this.stage === Stage.Playing) {
-      this.imbuing.request(player, args, this.now)
+      this.imbuing.request(player, args)
     }
   }
 
   /** trainorupgradeability: Alt with an ability's key, numbered from 1. */
   upgradeByKey(player: Player, args: string): void {
     if (this.stage === Stage.Playing) {
-      this.upgrades.request(player, args, this.now, 1)
+      this.upgrades.request(player, args, 1, this.now)
     }
   }
 
@@ -198,7 +200,14 @@ export class Flow {
    */
   upgradeBySlot(player: Player, args: string): void {
     if (this.stage === Stage.Playing) {
-      this.upgrades.request(player, args, this.now, 0)
+      this.upgrades.request(player, args, 0, this.now)
+    }
+  }
+
+  /** A click on the ability bar's icon or pips in slot, which Modlock reports. */
+  upgradeFromBar(player: Player, slot: number): void {
+    if (this.stage === Stage.Playing) {
+      this.upgrades.bar(player, slot, this.now)
     }
   }
 
@@ -213,7 +222,7 @@ export class Flow {
       log(`upgrade: ${name} of player ${player.slot}: not held`)
       return
     }
-    this.upgrades.request(player, String(held.slot), this.now, 0)
+    this.upgrades.request(player, String(held.slot), 0, this.now)
   }
 
   /**
@@ -292,6 +301,8 @@ export class Flow {
         hide(c.player)
         this.tabSender.forget(c.player.slot)
         this.painter.forget(c.player.slot)
+        forgetHidden(c.player.slot)
+        this.upgrades.forget(c.player.slot)
       }
     }
   }
@@ -304,8 +315,8 @@ export class Flow {
    * game's team picker hidden, and one on a team sees their team's spot. They
    * stay as they joined, on no team of the game's and without a hero, where the
    * game keeps the view still and the cursor free; a spectator's camera would
-   * fly and take the cursor. The client layout also hides the rest of the game's
-   * HUD until the last pick.
+   * fly and take the cursor. Modlock also hides the rest of the game's HUD
+   * until the last pick.
    */
   private seatWaiting(): void {
     // One still loading, as after a reconnect, keeps their team; one gone
@@ -457,7 +468,7 @@ export class Flow {
     this.painter.paintDraft(draft, this.now, {
       press: (p, spot) => this.press(p, spot),
       ready: (p) => this.ready(p),
-    }, this.tipHelpers.slots())
+    }, this.tipHelpers.tips())
   }
 
   /**
@@ -513,6 +524,12 @@ export class Flow {
     this.room.clearTeams()
     this.waitView.restore()
     this.painter.releaseScreens()
+    // A click on the ability bar sends the game nothing for a drafted ability.
+    for (const c of players()) {
+      if (!c.bot) {
+        abilityBarPresses(c.player, (player, slot) => this.upgradeFromBar(player, slot))
+      }
+    }
     // The seats were let go above, so the holds still known are those of
     // drafters who left.
     this.heroHold.releaseLeftovers()
@@ -541,7 +558,7 @@ export class Flow {
    * One hero is read each frame, in turn. Keeping its drafted abilities acts on
    * that fresh read alone, so nothing is granted twice from an older one, and a
    * changed read goes to the Tab screens and the ability bars at once. The
-   * Broker and the purchases follow the kept reads each READ_SECONDS.
+   * Broker follows the kept reads each READ_SECONDS.
    */
   private playFrame(draft: Draft): void {
     if (!this.botsCalled && matchStarted()) {
@@ -559,8 +576,6 @@ export class Flow {
       this.nextRead = this.now + READ_SECONDS
       const heroes = this.reads.all()
       this.broker.follow(heroes)
-      this.imbuing.follow(heroes, this.now)
-      this.upgrades.follow(this.now)
       if (matchOver()) {
         log('draft: the match is over; the game gets its HUD back')
         this.enter(Stage.Over)

@@ -1,68 +1,69 @@
 import { log, type Player } from 'modlock'
 
-import { ABILITY_SLOTS } from '../draft/slots'
-import { forgetUpgrades, routeUpgrades } from '../ui/client'
+import { ABILITY_SLOTS, type AbilitySlot } from '../draft/slots'
 
-/** How long an upgrade stays on the route, for the person's game to read it once. */
-const ROUTE_SECONDS = 1
+/**
+ * One click on the ability bar may reach the mod twice: as Modlock's bar press
+ * and as the game's own command, when the game finds an ability of the hero's
+ * for the slot. Two from different ways within this long are the same click.
+ */
+const SAME_CLICK_SECONDS = 0.5
 
+/** How a request to train reached the mod. */
+type Way = 'bar' | 'command'
+
+/** The last training sent for a player's slot, and whether a second way has answered for it. */
 interface Sent {
-  readonly order: number
-  /** in_ability and the key, pressed with Tab held. */
-  readonly line: string
+  readonly slot: AbilitySlot
+  readonly way: Way
   readonly at: number
+  paired: boolean
 }
 
-interface Person {
-  readonly player: Player
-  sent: readonly Sent[]
-}
-
-/** How the person's game buys the ability in slot: its key, pressed with Tab held; undefined where the slot is empty. */
-function purchaseOf(player: Player, slot: number): string | undefined {
-  return player.abilities().some((a) => a.slot === slot) ? `in_ability${slot + 1}` : undefined
-}
-
+/**
+ * Trains or upgrades a drafted ability for the game's own commands, which the
+ * mod claims, and for clicks on the ability bar, which Modlock reports: the
+ * game looks up the hero's own ability for a slot, so it would buy the wrong
+ * one or nothing. Modlock's trainAbility runs the game's own upgrade on the
+ * ability the hero holds there, charging the unlock or the points.
+ */
 export class KeyUpgrades {
-  /** By the person's slot. */
-  private readonly people = new Map<number, Person>()
-  private nextOrder = 1
+  /** By the player's slot. */
+  private readonly last = new Map<number, Sent>()
 
   /** Takes the arguments of trainorupgradeability, the key's number from 1, or of upgrade_ability, the slot's from 0. */
-  request(player: Player, args: string, now: number, first: number): void {
+  request(player: Player, args: string, first: number, now: number): void {
     const slot = ABILITY_SLOTS.find((each) => /^\d+$/.test(args) && each === Number(args) - first)
-    if (slot === undefined) {
-      return
+    if (slot !== undefined) {
+      this.train(player, slot, 'command', now)
     }
-    const line = purchaseOf(player, slot)
-    log(`upgrade: key ${slot} of player ${player.slot}: ${line ?? 'nothing there'}`)
-    if (line === undefined) {
-      return
-    }
-    const person = this.people.get(player.slot) ?? { player, sent: [] }
-    person.sent = [...person.sent, { order: this.nextOrder++, line, at: now }]
-    this.people.set(player.slot, person)
-    routeUpgrades(player, person.sent.map((each) => [each.order, each.line]))
   }
 
-  /** Takes each upgrade off its route once the person's game has had time to read it. */
-  follow(now: number): void {
-    for (const [slot, person] of this.people) {
-      const kept = person.sent.filter((each) => now - each.at < ROUTE_SECONDS)
-      if (kept.length === person.sent.length) {
-        continue
-      }
-      person.sent = kept
-      if (kept.length === 0) {
-        this.people.delete(slot)
-        forgetUpgrades(person.player)
-      } else {
-        routeUpgrades(person.player, kept.map((each) => [each.order, each.line]))
-      }
+  /** Takes a click on the ability bar in slot. */
+  bar(player: Player, slot: number, now: number): void {
+    const held = ABILITY_SLOTS.find((each) => each === slot)
+    if (held !== undefined) {
+      this.train(player, held, 'bar', now)
     }
+  }
+
+  forget(slot: number): void {
+    this.last.delete(slot)
   }
 
   clear(): void {
-    this.people.clear()
+    this.last.clear()
+  }
+
+  private train(player: Player, slot: AbilitySlot, way: Way, now: number): void {
+    // The other way's word for the same click trains nothing more.
+    const last = this.last.get(player.slot)
+    if (last !== undefined && !last.paired && last.slot === slot && last.way !== way && now - last.at < SAME_CLICK_SECONDS) {
+      last.paired = true
+      return
+    }
+    this.last.set(player.slot, { slot, way, at: now, paired: false })
+    const trained = player.trainAbility(slot)
+    log(`upgrade: ${way} ${slot} of player ${player.slot}: ${trained ? 'trained' : 'refused'}`)
   }
 }

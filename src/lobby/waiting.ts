@@ -1,7 +1,7 @@
 import { type Connection, type EntityPlacement, entityPosition, log, moveEntity } from 'modlock'
 
 import type { Team } from '../draft/teams'
-import { hideGameHud, hidePicker } from '../ui/client'
+import { hideGameHud, hidePicker } from '../ui/hud'
 import { observerOf, SPOTS } from './camera'
 
 const VIEW_SECONDS = 1
@@ -32,7 +32,8 @@ export class WaitView {
 
   /**
    * The game's team picker stays hidden until the match begins, and its whole
-   * HUD until the last pick; the client layout hides both.
+   * HUD until the last pick; Modlock hides both and gives them back when
+   * the person leaves.
    */
   private hideGameUi(c: Connection): void {
     const slot = c.player.slot
