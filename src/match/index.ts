@@ -1,0 +1,10 @@
+/** What the rest of the mod takes from match. */
+export { grant, keepUpgrades, spawned } from '@match/abilities'
+export { sleepBots, toughenBots, wakeBots } from '@match/bots'
+export { HeroHold, MatchHold } from '@match/holds'
+export { ImbuingPurchases } from '@match/imbuing'
+export { matchStarted, startOnRopes } from '@match/lanes'
+export { LateArrivals } from '@match/late'
+export { matchOver } from '@match/over'
+export { connectedPeople, controllerOf, type HeroRead, HeroReads, playerAt } from '@match/roster'
+export { KeyUpgrades } from '@match/upgrades'

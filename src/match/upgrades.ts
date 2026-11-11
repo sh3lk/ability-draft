@@ -1,6 +1,6 @@
 import { log, type Player } from 'modlock'
 
-import { ABILITY_SLOTS, type AbilitySlot } from '../draft/slots'
+import { ABILITY_SLOTS, type AbilitySlot } from '@draft'
 
 /**
  * One click on the ability bar may reach the mod twice: as Modlock's bar press
@@ -58,7 +58,7 @@ export class KeyUpgrades {
   private train(player: Player, slot: AbilitySlot, way: Way, now: number): void {
     // The other way's word for the same click trains nothing more.
     const last = this.last.get(player.slot)
-    if (last !== undefined && !last.paired && last.slot === slot && last.way !== way && now - last.at < SAME_CLICK_SECONDS) {
+    if (last && !last.paired && last.slot === slot && last.way !== way && now - last.at < SAME_CLICK_SECONDS) {
       last.paired = true
       return
     }

@@ -1,8 +1,7 @@
 import { findEntities, log, type Player, readField, writeField } from 'modlock'
 
-import type { Seat } from '../draft/draft'
-import { Team } from '../draft/teams'
-import { controllerOf, playerAt } from './roster'
+import { type Seat, Team } from '@draft'
+import { controllerOf, playerAt } from '@match/roster'
 
 /**
  * dl_midtown's lanes, as its barracks and ropes number them. The game's other
@@ -23,7 +22,7 @@ const GAME_IN_PROGRESS = 7
 
 function assignLane(player: Player, lane: Lane): boolean {
   const pawn = player.pawn()
-  const controller = pawn === undefined ? undefined : controllerOf(pawn.entity)
+  const controller = pawn ? controllerOf(pawn.entity) : undefined
   return controller !== undefined &&
     writeField(controller, 'CCitadelPlayerController', 'm_nAssignedLane', 'int8', lane) &&
     writeField(controller, 'CCitadelPlayerController', 'm_nOriginalLaneAssignment', 'int8', lane)
@@ -39,7 +38,7 @@ function assignLanes(seats: readonly Seat[]): void {
     const counts = new Map<Lane, number>()
     for (const seat of seats.filter((s) => s.team === team && !s.bot)) {
       const player = playerAt(seat.slot)
-      if (player === undefined) {
+      if (!player) {
         continue
       }
       const lane = emptiestLane(counts)

@@ -1,6 +1,6 @@
 import type { Player } from 'modlock'
 
-import { AbilitySlot } from '../draft/slots'
+import { AbilitySlot } from '@draft'
 
 const BROUGHT: ReadonlyMap<string, string> = new Map([
   ['ability_chessmaster_queen', 'ability_chessmaster_movechesspiece'],
@@ -13,7 +13,7 @@ export function makeRoomFor(player: Player, abilityName: string): void {
     return
   }
   const held = player.abilities().find((a) => a.slot === AbilitySlot.Alternate)
-  if (held !== undefined && held.name !== brought) {
+  if (held && held.name !== brought) {
     player.replaceAbility(AbilitySlot.Alternate, brought)
   }
 }

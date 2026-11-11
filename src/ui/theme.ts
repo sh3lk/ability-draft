@@ -1,4 +1,4 @@
-import { Team } from '../draft/teams'
+import { Team } from '@draft'
 
 export enum Color {
   Gold = '#ffd34d',

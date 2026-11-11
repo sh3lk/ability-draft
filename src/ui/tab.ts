@@ -1,9 +1,7 @@
 import { type AbilityRow, abilityDisplay, type Player, players } from 'modlock'
 
-import { heroById, type PoolAbility, poolAbility, type PoolHero } from '../draft/pool'
-import { ABILITY_SLOTS } from '../draft/slots'
-import type { Team } from '../draft/teams'
-import { connectedPeople, type HeroRead } from '../match/roster'
+import { ABILITY_SLOTS, heroById, type PoolAbility, poolAbility, type PoolHero, type Team } from '@draft'
+import { connectedPeople, type HeroRead } from '@match'
 
 /** The picture of an ability outside the pool, which has none of its own here. */
 const UNKNOWN_ICON = 's2r://panorama/images/hud/ping/ping_icon_question.vsvg'
@@ -12,7 +10,7 @@ interface RowAbility {
   /** The game's name of the ability the hero holds, or '' for none. */
   readonly name: string
   /** Undefined for one outside the pool. */
-  readonly ability: PoolAbility | undefined
+  readonly ability: Optional<PoolAbility>
   /** The bought tiers: bit 0 unlocks it and bits 1 to 3 are its upgrades. */
   readonly upgrades: number
 }
@@ -20,7 +18,7 @@ interface RowAbility {
 interface HeroRow {
   readonly player: Player
   readonly team: Team
-  readonly hero: PoolHero | undefined
+  readonly hero: Optional<PoolHero>
   readonly abilities: readonly RowAbility[]
 }
 
@@ -39,7 +37,7 @@ function heroRows(heroes: readonly HeroRead[], bought: ReadonlyMap<number, reado
     const abilities: RowAbility[] = ABILITY_SLOTS.map((slot) => {
       const held = owned.find((a) => a.slot === slot)
       const upgrades = (keys[slot] ?? 0) | (held?.upgrades ?? 0)
-      return { name: held?.name ?? '', ability: held === undefined ? undefined : poolAbility(held.name), upgrades }
+      return { name: held?.name ?? '', ability: held ? poolAbility(held.name) : undefined, upgrades }
     })
     rows.push({ player: c.player, team: pawn.team, hero: heroById(pawn.hero), abilities })
   }

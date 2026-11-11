@@ -1,4 +1,4 @@
-import { poolHeroes } from './pool.gen'
+import { poolHeroes } from '@draft/pool.gen'
 
 export { poolHeroes }
 
@@ -30,7 +30,7 @@ export function heroCard(hero: PoolHero): string {
   return hero.portrait.replace(/_sm\.(psd|png)$/, '_card.psd')
 }
 
-export function heroById(id: number): PoolHero | undefined {
+export function heroById(id: number): Optional<PoolHero> {
   return poolHeroes.find((h) => h.id === id)
 }
 
@@ -57,14 +57,14 @@ export function drafted(ability: PoolAbility): boolean {
  * The offered ability named name, or the one whose form in use it is, such as
  * ability_fencer_riposte for ability_fencer_riposte_target_select.
  */
-export function poolAbility(name: string): PoolAbility | undefined {
+export function poolAbility(name: string): Optional<PoolAbility> {
   const own = poolAbilities.get(name)
-  if (own !== undefined) {
+  if (own) {
     return own
   }
-  let best: PoolAbility | undefined
+  let best: Optional<PoolAbility>
   for (const base of poolAbilities.values()) {
-    if (name.startsWith(`${base.name}_`) && (best === undefined || base.name.length > best.name.length)) {
+    if (name.startsWith(`${base.name}_`) && (!best || base.name.length > best.name.length)) {
       best = base
     }
   }

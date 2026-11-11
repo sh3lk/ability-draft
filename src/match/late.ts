@@ -1,7 +1,7 @@
 import { type Connection, log } from 'modlock'
 
-import { hidePicker } from '../ui/hud'
-import { Word } from '../ui/text'
+import { hidePicker } from '@ui/hud'
+import { Word } from '@ui/text'
 
 export class LateArrivals {
   /** The connection already sent to the spectators, by slot. */

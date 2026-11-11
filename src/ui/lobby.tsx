@@ -1,10 +1,10 @@
 import { type Connection, type Player, show, type Style } from 'modlock'
 
-import { BROKER_OPENINGS, BrokerOpening } from '../broker/broker'
-import { Team, TEAM_SEATS } from '../draft/teams'
-import { Sound } from './sounds'
-import { teamName, Word } from './text'
-import { Color, teamColor, teamTint } from './theme'
+import { BROKER_OPENINGS, BrokerOpening } from '@broker'
+import { Team, TEAM_SEATS } from '@draft'
+import { Sound } from '@ui/sounds'
+import { teamName, Word } from '@ui/text'
+import { Color, teamColor, teamTint } from '@ui/theme'
 
 const TEAM_WIDTH = 430
 const GUTTER = 18
@@ -95,9 +95,9 @@ export function drawLobby(player: Player, view: LobbyView): void {
           >
             {status}
           </label>
-          {me === undefined
-            ? <label style={{ horizontalAlign: 'center', fontSize: 16, color: Color.Muted }}>{Word.NoSeat}</label>
-            : readyButton(me.ready, view.toggleReady)}
+          {me
+            ? readyButton(me.ready, view.toggleReady)
+            : <label style={{ horizontalAlign: 'center', fontSize: 16, color: Color.Muted }}>{Word.NoSeat}</label>}
         </panel>
       </panel>
     </panel>,
@@ -109,7 +109,7 @@ export function drawLobby(player: Player, view: LobbyView): void {
  * press takes the next choice. A plain call, as readyButton is.
  */
 function brokerButton(chosen: BrokerOpening, onChoose: (opening: BrokerOpening) => void) {
-  const next = BROKER_OPENINGS[(BROKER_OPENINGS.indexOf(chosen) + 1) % BROKER_OPENINGS.length]
+  const next = BROKER_OPENINGS[(BROKER_OPENINGS.indexOf(chosen) + 1) % BROKER_OPENINGS.length] ?? chosen
   const shown = chosen === BrokerOpening.Never ? Word.BrokerNever : `${chosen} ${Word.Minutes}`
   return (
     <button
@@ -151,7 +151,7 @@ function readyButton(ready: boolean, onPress: (player: Player) => void) {
   )
 }
 
-function TeamColumn(props: { team: Team; me: LobbyPerson | undefined; view: LobbyView }) {
+function TeamColumn(props: { team: Team; me: Optional<LobbyPerson>; view: LobbyView }) {
   const { team, me, view } = props
   const people = view.people.filter((p) => p.team === team)
   const bots = view.bots.filter((b) => b.team === team)
@@ -188,7 +188,7 @@ function TeamColumn(props: { team: Team; me: LobbyPerson | undefined; view: Lobb
         </label>
       ))}
       <panel style={{ flow: 'right', horizontalAlign: 'center', margin: [4, 0, 0, 0] }}>
-        {me !== undefined && me.team !== team && hasRoom
+        {me && me.team !== team && hasRoom
           ? <SmallButton text={Word.JoinTeam} color={color} onPress={(player) => view.join(player, team)} />
           : null}
         {hasRoom

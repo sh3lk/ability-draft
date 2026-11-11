@@ -1,8 +1,7 @@
 import { addBot, type EntityPlacement, entityPosition, log, moveEntity, type Player, players, readField, type Vector, writeField } from 'modlock'
 
-import type { PoolHero } from '../draft/pool'
-import { Team } from '../draft/teams'
-import { SPOTS } from '../lobby/camera'
+import { type PoolHero, Team } from '@draft'
+import { SPOTS } from '@lobby/camera'
 
 /** Where the helpers stand, in turn: each team's view of the lobby. */
 const PLACES: readonly EntityPlacement[] = [SPOTS[Team.HiddenKing], SPOTS[Team.Archmother]]
@@ -69,9 +68,9 @@ export class TooltipHelpers {
     this.forgetGone()
     this.keepNextAside()
     const newest = this.helpers[this.helpers.length - 1]
-    if (newest !== undefined && !newest.ready) {
+    if (newest && !newest.ready) {
       const pawn = newest.bot.pawn()
-      if (pawn !== undefined) {
+      if (pawn) {
         // It stands in a team's view, so it hides and goes there at once
         // rather than in turn.
         keepAside(newest, pawn.entity)
@@ -93,13 +92,16 @@ export class TooltipHelpers {
       return
     }
     const hero = this.waiting[0]
-    if (hero === undefined || now < this.retryAt) {
+    if (!hero || now < this.retryAt) {
       return
     }
     const name = `Ability Draft ${this.made + 1}`
     const place = PLACES[this.made % PLACES.length]
+    if (!place) {
+      return
+    }
     const bot = addBot({ name, team: Team.HiddenKing, hero: hero.name, position: place.position })
-    if (bot === undefined) {
+    if (!bot) {
       if (!this.refused) {
         log(`draft: the game refused a tooltip helper for ${hero.name}; asking again every ${RETRY_SECONDS} s`)
       }
@@ -124,6 +126,9 @@ export class TooltipHelpers {
     }
     this.nextAside %= this.helpers.length
     const helper = this.helpers[this.nextAside]
+    if (!helper) {
+      return
+    }
     const entity = helper.bot.pawn()?.entity
     this.nextAside++
     if (entity !== undefined) {
@@ -140,7 +145,7 @@ export class TooltipHelpers {
     const here = new Map(players().map((c) => [c.player.slot, c]))
     for (const helper of [...this.helpers]) {
       const c = here.get(helper.bot.slot)
-      if (c !== undefined && c.bot && c.name === helper.name) {
+      if (c && c.bot && c.name === helper.name) {
         helper.seen = true
       } else if (helper.seen) {
         log(`draft: tooltip helper for ${helper.hero.name} left`)
@@ -212,7 +217,7 @@ function keepAside(helper: Helper, entity: number): void {
   hide(entity)
   const at = entityPosition(entity)?.position
   const { position, facing } = helper.place
-  if (at === undefined || Math.hypot(at.x - position.x, at.y - position.y, at.z - position.z) <= STRAY) {
+  if (!at || Math.hypot(at.x - position.x, at.y - position.y, at.z - position.z) <= STRAY) {
     return
   }
   helper.moves++

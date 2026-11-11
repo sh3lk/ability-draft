@@ -3,8 +3,8 @@ import {
 } from 'modlock'
 import { set } from 'modlock/console'
 
-import type { HeroRead } from '../match/roster'
-import { corruptBotItems } from './bot-items'
+import { corruptBotItems } from '@broker/bot-items'
+import type { HeroRead } from '@match'
 
 /** One of the Broker's two places on dl_midtown, as the map's entity data has it. */
 interface Booth {
@@ -67,7 +67,7 @@ function facingOf(booth: Booth): Angles {
   return { pitch: 0, yaw: booth.yaw, roll: 0 }
 }
 
-function createClosedZone(booth: Booth): number | undefined {
+function createClosedZone(booth: Booth): Optional<number> {
   return createEntity({
     designerName: 'citadel_trigger_corrupted_item_shop',
     subclass: '',

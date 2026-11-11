@@ -1,10 +1,10 @@
 import { freeCursor, type Player, players, show } from 'modlock'
 
-import { type Draft, Phase } from '../draft/draft'
-import { connectedPeople } from '../match/roster'
-import { type DraftActions, drawDraft } from './board'
-import { showGameHud, showOverHud, showPicker } from './hud'
-import { drawLobby, type LobbyActions, type LobbyRoom } from './lobby'
+import { type Draft, Phase } from '@draft'
+import { connectedPeople } from '@match'
+import { type DraftActions, drawDraft } from '@ui/board'
+import { showGameHud, showOverHud, showPicker } from '@ui/hud'
+import { drawLobby, type LobbyActions, type LobbyRoom } from '@ui/lobby'
 
 const NO_BOARD = 'none'
 const OVER = 'over'

@@ -7,6 +7,6 @@ export enum Team {
 export const TEAM_SEATS = 6
 
 /** Modlock reports a team as a plain number; this is where it becomes a Team. */
-export function isTeam(team: number | undefined): team is Team {
+export function isTeam(team: Optional<number>): team is Team {
   return team === Team.HiddenKing || team === Team.Archmother
 }

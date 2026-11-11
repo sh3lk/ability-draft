@@ -1,4 +1,4 @@
-import { Team } from '../draft/teams'
+import { Team } from '@draft'
 
 export enum Word {
   Title = 'Ability Draft',

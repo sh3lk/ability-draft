@@ -1,7 +1,7 @@
 import { type EntityPlacement, findEntities } from 'modlock'
 
-import { Team } from '../draft/teams'
-import { controllerOf } from '../match/roster'
+import { Team } from '@draft'
+import { controllerOf } from '@match'
 
 /** As the players chose them. */
 export const SPOTS: Readonly<Record<Team, EntityPlacement>> = {
@@ -12,7 +12,7 @@ export const SPOTS: Readonly<Record<Team, EntityPlacement>> = {
 const HANDLE_INDEX_MASK = 0x7fff
 
 /** A slot's controller is the entity at index slot + 1. */
-export function observerOf(slot: number): number | undefined {
+export function observerOf(slot: number): Optional<number> {
   return findEntities('observer').find((pawn) => {
     const controller = controllerOf(pawn)
     return controller !== undefined && (controller & HANDLE_INDEX_MASK) === slot + 1

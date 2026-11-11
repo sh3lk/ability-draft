@@ -1,8 +1,8 @@
 import { type Connection, type EntityPlacement, entityPosition, log, moveEntity } from 'modlock'
 
-import type { Team } from '../draft/teams'
-import { hideGameHud, hidePicker } from '../ui/hud'
-import { observerOf, SPOTS } from './camera'
+import type { Team } from '@draft'
+import { observerOf, SPOTS } from '@lobby/camera'
+import { hideGameHud, hidePicker } from '@ui'
 
 const VIEW_SECONDS = 1
 
@@ -10,9 +10,9 @@ interface HeldView {
   readonly generation: number
   readonly team: Team
   readonly at: number
-  readonly observer: number | undefined
+  readonly observer: Optional<number>
   /** Where the game kept the observer, noted before its first move, to put it back after the draft. */
-  readonly home: EntityPlacement | undefined
+  readonly home: Optional<EntityPlacement>
 }
 
 export class WaitView {
@@ -60,7 +60,7 @@ export class WaitView {
     // the one found is kept for the connection and sought again only when
     // moving it fails.
     const spot = SPOTS[team]
-    const moveTo = (entity: number | undefined) =>
+    const moveTo = (entity: Optional<number>) =>
       entity !== undefined && moveEntity(entity, spot.position, spot.facing)
     let observer = known?.observer
     let home = known?.home
@@ -87,7 +87,7 @@ export class WaitView {
    */
   restore(): void {
     for (const [slot, view] of this.held) {
-      if (view.observer !== undefined && view.home !== undefined) {
+      if (view.observer !== undefined && view.home) {
         const { position, facing } = view.home
         const back = moveEntity(view.observer, position, facing)
         const where = `${Math.round(position.x)} ${Math.round(position.y)} ${Math.round(position.z)}`

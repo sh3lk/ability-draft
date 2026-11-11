@@ -1,8 +1,8 @@
 import { holdMatchClock, holdModifierState, matchClock, type Pawn, Player } from 'modlock'
 import { apply } from 'modlock/console'
 
-import type { Seat } from '../draft/draft'
-import { playerAt } from './roster'
+import type { Seat } from '@draft'
+import { playerAt } from '@match/roster'
 
 /**
  * A person's hero waits with every button blocked: the server sees no key and
@@ -68,7 +68,7 @@ export class HeroHold {
     for (const seat of seats) {
       const player = playerAt(seat.slot)
       const pawn = player?.pawn()
-      if (player === undefined || pawn === undefined || pawn.health <= 0) {
+      if (!player || !pawn || pawn.health <= 0) {
         continue
       }
       // A player who joined again in the slot lost their block, so the
@@ -89,7 +89,7 @@ export class HeroHold {
   letGo(player: Player): void {
     const held = this.heldPawns.get(player.slot)
     player.blockInput(NO_BUTTON)
-    if (held !== undefined) {
+    if (held) {
       liftStates(held.entity)
     }
     this.heldPawns.delete(player.slot)

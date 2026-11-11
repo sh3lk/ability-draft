@@ -1,9 +1,9 @@
 import { type Connection, players } from 'modlock'
 
-import { BrokerOpening } from '../broker/broker'
-import { Team, TEAM_SEATS } from '../draft/teams'
-import { connectedPeople } from '../match/roster'
-import type { LobbyRoom, SeatedBot } from '../ui/lobby'
+import { BrokerOpening } from '@broker'
+import { Team, TEAM_SEATS } from '@draft'
+import { connectedPeople } from '@match'
+import type { LobbyRoom, SeatedBot } from '@ui'
 
 /** So one can still take their ready back. */
 const START_SECONDS = 3
@@ -22,12 +22,12 @@ export class Room {
   /** By slot, until the draft gives them a hero. */
   private readonly teams = new Map<number, Team>()
   private readonly lobbyReady = new Set<number>()
-  private startAt: number | undefined
+  private startAt: Optional<number>
   private readonly seatedBots: SeatedBot[] = []
   /** Kept from one lobby to the next. */
   private broker = BrokerOpening.Thirty
 
-  teamOf(slot: number): Team | undefined {
+  teamOf(slot: number): Optional<Team> {
     return this.teams.get(slot)
   }
 
@@ -138,7 +138,7 @@ export class Room {
 
   /** Team.HiddenKing on a tie. Counts those waiting, the seated bots and the heroes on the map but the helpers. */
   private smallerTeam(): Team {
-    const onTeams: (number | undefined)[] = [
+    const onTeams: Optional<number>[] = [
       ...this.people().map((p) => p.team),
       ...this.seatedBots.map((s) => s.team),
       ...players().filter((c) => !this.teams.has(c.player.slot) && !this.helper(c.player.slot)).map((c) => c.player.pawn()?.team),
@@ -153,7 +153,7 @@ export class Room {
    * between two open teams reads the heroes on the map, so those who wait
    * with no seat cost nothing each frame.
    */
-  openTeam(): Team | undefined {
+  openTeam(): Optional<Team> {
     const open = [Team.HiddenKing, Team.Archmother].filter((team) => this.teamCount(team) < TEAM_SEATS)
     return open.length === 2 ? this.smallerTeam() : open[0]
   }

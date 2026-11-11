@@ -1,27 +1,16 @@
 import { abilityBarPresses, addBot, hide, holdReload, log, type Player, players } from 'modlock'
 
-import { Broker, setBrokerOpening } from './broker/broker'
-import { Draft, type Entrant, NO_SEAT, Phase, pickBoard, type Seat, type Spot } from './draft/draft'
-import { leftoverPicks } from './draft/leftovers'
-import { heroById, NO_HERO, type PoolHero, poolHeroes } from './draft/pool'
-import { isTeam } from './draft/teams'
-import { Room } from './lobby/room'
-import { WaitView } from './lobby/waiting'
-import { grant, keepUpgrades, spawned } from './match/abilities'
-import { sleepBots, toughenBots, wakeBots } from './match/bots'
-import { HeroHold, MatchHold } from './match/holds'
-import { ImbuingPurchases } from './match/imbuing'
-import { matchStarted, startOnRopes } from './match/lanes'
-import { LateArrivals } from './match/late'
-import { matchOver } from './match/over'
-import { connectedPeople, type HeroRead, HeroReads, playerAt } from './match/roster'
-import { KeyUpgrades } from './match/upgrades'
-import { clearHidden, forgetHidden, showGameHud } from './ui/hud'
-import { Cues } from './ui/cues'
-import { TooltipHelpers } from './ui/helper'
-import { Painter } from './ui/painter'
-import { TabSender } from './ui/tab'
-import { Word } from './ui/text'
+import { Broker, setBrokerOpening } from '@broker'
+import {
+  Draft, type Entrant, heroById, isTeam, leftoverPicks, NO_HERO, NO_SEAT, Phase, pickBoard, type PoolHero, poolHeroes,
+  type Seat, type Spot,
+} from '@draft'
+import { Room, WaitView } from '@lobby'
+import {
+  connectedPeople, grant, HeroHold, type HeroRead, HeroReads, ImbuingPurchases, keepUpgrades, KeyUpgrades, LateArrivals,
+  MatchHold, matchOver, matchStarted, playerAt, sleepBots, spawned, startOnRopes, toughenBots, wakeBots,
+} from '@match'
+import { clearHidden, Cues, forgetHidden, Painter, showGameHud, TabSender, TooltipHelpers, Word } from '@ui'
 
 const HERO_WAIT_SECONDS = 20
 /** How long the seats' bots wait for the tooltips' helpers to leave before they join anyway. */
@@ -53,9 +42,9 @@ enum Stage {
 
 export class Flow {
   private stage: Stage = Stage.Lobby
-  private draft: Draft | undefined
+  private draft: Optional<Draft>
   /** The next draft's board, picked as the lobby opens, so that its tooltips' helpers come before the draft. */
-  private nextBoard: PoolHero[] | undefined
+  private nextBoard: Optional<PoolHero[]>
   /** Whether the seats' bots joined the match; see playFrame. */
   private botsCalled = false
   private now = 0
@@ -125,7 +114,7 @@ export class Flow {
       this.seatWaiting()
     }
     const draft = this.draft
-    if (this.stage === Stage.Lobby || draft === undefined) {
+    if (this.stage === Stage.Lobby || !draft) {
       this.prepareBoard()
       if (this.room.advanceCountdown(this.now)) {
         this.begin()
@@ -161,7 +150,7 @@ export class Flow {
   private begin(): void {
     const { entrants, excluded } = this.gatherEntrants()
     let board = this.nextBoard
-    if (board === undefined || board.some((h) => excluded.has(h.id))) {
+    if (!board || board.some((h) => excluded.has(h.id))) {
       // A hero someone brought to the map since the lobby opened leaves the
       // board, which is picked again with its helpers.
       this.tipHelpers.remove()
@@ -218,7 +207,7 @@ export class Flow {
     }
     const name = args.trim()
     const held = player.abilities().find((a) => a.name === name)
-    if (held === undefined) {
+    if (!held) {
       log(`upgrade: ${name} of player ${player.slot}: not held`)
       return
     }
@@ -242,10 +231,10 @@ export class Flow {
       player.chat(Word.HeroInDraft)
     } else if (hasHero) {
       player.chat(Word.HeroLocked)
-    } else if (seat?.hero !== undefined) {
+    } else if (seat?.hero) {
       log(`draft: selecthero from player ${player.slot}: the drafted ${seat.hero.name} on team ${seat.team}`)
       this.heroClickedAt.set(player.slot, this.now)
-    } else if (seat === undefined) {
+    } else if (!seat) {
       player.chat(Word.MatchStarted)
     }
   }
@@ -257,7 +246,7 @@ export class Flow {
    * come.
    */
   private prepareBoard(): void {
-    if (this.nextBoard === undefined) {
+    if (!this.nextBoard) {
       this.nextBoard = pickBoard(this.gatherEntrants().excluded)
       this.tipHelpers.start(this.nextBoard)
     }
@@ -278,7 +267,7 @@ export class Flow {
       // marks their seat away, so the draft picks for them until they are back.
       if (!c.bot && team !== undefined) {
         entrants.push({ slot: c.player.slot, name: c.name, bot: false, team, steamId: c.steamId })
-      } else if (pawn !== undefined) {
+      } else if (pawn) {
         // A hero already on the map, such as a bot from before, stays its own.
         excluded.add(pawn.hero)
       }
@@ -328,7 +317,7 @@ export class Flow {
       const slot = c.player.slot
       const seat = this.draft?.seatAt(slot)
       // In the heroes stage a seated person is getting their drafted hero.
-      if (this.stage === Stage.Heroes && seat !== undefined) {
+      if (this.stage === Stage.Heroes && seat) {
         continue
       }
       // With both teams full one waits with no seat, and in the lobby takes
@@ -421,10 +410,10 @@ export class Flow {
         continue
       }
       const c = roster.find((r) => r.player.slot === seat.slot)
-      if (!seat.away && (c === undefined || !c.ready)) {
+      if (!seat.away && (!c || !c.ready)) {
         draft.leave(seat.slot, this.now)
         this.painter.invalidate()
-      } else if (seat.away && c !== undefined && c.ready && !c.bot && c.steamId === seat.steamId) {
+      } else if (seat.away && c && c.ready && !c.bot && c.steamId === seat.steamId) {
         draft.rejoin(seat.slot, this.now)
         this.painter.invalidate()
       }
@@ -449,7 +438,7 @@ export class Flow {
    */
   private press(player: Player, spot: Spot): void {
     const draft = this.draft
-    if (draft === undefined || (draft.phase !== Phase.Picking && draft.phase !== Phase.Preview)) {
+    if (!draft || (draft.phase !== Phase.Picking && draft.phase !== Phase.Preview)) {
       return
     }
     const seat = draft.seatIndexOf(player.slot)
@@ -480,11 +469,11 @@ export class Flow {
   private callBots(draft: Draft): void {
     wakeBots()
     for (const seat of draft.seats) {
-      if (!seat.bot || seat.hero === undefined) {
+      if (!seat.bot || !seat.hero) {
         continue
       }
       const bot = addBot({ name: seat.name, team: seat.team, hero: seat.hero.name })
-      if (bot === undefined) {
+      if (!bot) {
         log(`draft: could not add the bot ${seat.name} with ${seat.hero.name}`)
         continue
       }
@@ -497,17 +486,17 @@ export class Flow {
     let standing = true
     for (const seat of draft.seats) {
       const player = playerAt(seat.slot)
-      if (seat.away || player === undefined) {
+      if (seat.away || !player) {
         continue
       }
       const pawn = player.pawn()
       // A bot joined with its drafted hero, so it only has to stand.
-      if (!seat.bot && seat.hero !== undefined && pawn?.hero !== seat.hero.id) {
+      if (!seat.bot && seat.hero && pawn?.hero !== seat.hero.id) {
         standing = false
         if (this.askDue(seat.slot)) {
           player.selectHero(seat.hero.name, seat.team)
         }
-      } else if (pawn === undefined || !spawned(pawn, () => player.abilities())) {
+      } else if (!pawn || !spawned(pawn, () => player.abilities())) {
         standing = false
       }
     }
@@ -546,7 +535,7 @@ export class Flow {
   private letGoAndGrant(draft: Draft): void {
     for (const seat of draft.seats) {
       const player = playerAt(seat.slot)
-      if (player === undefined) {
+      if (!player) {
         continue
       }
       this.heroHold.letGo(player)
@@ -566,7 +555,7 @@ export class Flow {
       this.callBots(draft)
     }
     const next = this.reads.readNext()
-    if (next !== undefined) {
+    if (next) {
       this.keepAbilities(draft, next.read)
       if (next.changed) {
         this.tabSender.send(this.reads.all(), this.bought)
@@ -596,7 +585,7 @@ export class Flow {
     for (const [slot, clickedAt] of this.heroClickedAt) {
       const seat = draft.seatAt(slot)
       const player = playerAt(slot)
-      if (seat?.hero === undefined || player === undefined || player.pawn()?.hero === seat.hero.id ||
+      if (!seat?.hero || !player || player.pawn()?.hero === seat.hero.id ||
         this.now - clickedAt > HERO_WAIT_SECONDS) {
         this.heroClickedAt.delete(slot)
       } else if (this.askDue(slot)) {
@@ -608,14 +597,14 @@ export class Flow {
   /** Those with no hero on a team who drafted no seat watch as spectators until the next match. */
   private leaveLateOut(draft: Draft): void {
     const fielded = new Set(this.reads.all().filter((h) => h.pawn.hero !== NO_HERO).map((h) => h.connection.player.slot))
-    const waiting = connectedPeople().filter((c) => draft.seatAt(c.player.slot) === undefined && !fielded.has(c.player.slot))
+    const waiting = connectedPeople().filter((c) => !draft.seatAt(c.player.slot) && !fielded.has(c.player.slot))
     this.lateArrivals.follow(waiting)
   }
 
   private keepAbilities(draft: Draft, hero: HeroRead): void {
     const { connection: c, pawn, owned } = hero
     const seat = draft.seatAt(c.player.slot) ?? this.lateSeat(draft, hero)
-    if (seat !== undefined && spawned(pawn, () => owned)) {
+    if (seat && spawned(pawn, () => owned)) {
       grant(c.player, seat.picks, owned)
       const bought = this.bought.get(c.player.slot) ?? []
       this.bought.set(c.player.slot, bought)
@@ -623,7 +612,7 @@ export class Flow {
     }
   }
 
-  private lateSeat(draft: Draft, { connection: c, pawn }: HeroRead): Seat | undefined {
+  private lateSeat(draft: Draft, { connection: c, pawn }: HeroRead): Optional<Seat> {
     // One who joined a team after the draft gets no hero; see leaveLateOut.
     if (pawn.hero === NO_HERO) {
       return undefined

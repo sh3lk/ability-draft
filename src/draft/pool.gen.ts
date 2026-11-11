@@ -1,4 +1,4 @@
-import type { PoolHero } from './pool'
+import type { PoolHero } from '@draft/pool'
 
 /** Sorted by title, each with its four abilities. */
 export const poolHeroes: readonly PoolHero[] = [

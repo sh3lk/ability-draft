@@ -1,12 +1,12 @@
 import { type Child, log, type Player, show, type Style, type UiElement } from 'modlock'
 
-import { type Draft, HERO_COLUMN, NO_SEAT, Phase, POOL_SIZE, type Seat, type Spot } from '../draft/draft'
-import { drafted, heroCard, type PoolAbility, type PoolHero } from '../draft/pool'
-import { AbilitySlot, REGULAR_ABILITIES } from '../draft/slots'
-import { Team } from '../draft/teams'
-import { COUNTDOWN_SECONDS, Sound } from './sounds'
-import { teamName, Word } from './text'
-import { Color, Dim, teamColor, teamTint } from './theme'
+import {
+  AbilitySlot, type Draft, drafted, HERO_COLUMN, heroCard, NO_SEAT, Phase, POOL_SIZE, type PoolAbility, type PoolHero,
+  REGULAR_ABILITIES, type Seat, type Spot, Team,
+} from '@draft'
+import { COUNTDOWN_SECONDS, Sound } from '@ui/sounds'
+import { teamName, Word } from '@ui/text'
+import { Color, Dim, teamColor, teamTint } from '@ui/theme'
 
 const ICON_SIZE = 56
 
@@ -107,6 +107,11 @@ function draftScreen(board: BoardProps, side: number): UiElement {
   )
 }
 
+/** Array.isArray does not narrow a readonly array, so the list has its own guard. */
+function isList(child: Child): child is readonly Child[] {
+  return Array.isArray(child)
+}
+
 /** Each element and each loose text is a panel. */
 function countPanels(child: Child): number {
   if (child === null || child === undefined || typeof child === 'boolean') {
@@ -115,8 +120,12 @@ function countPanels(child: Child): number {
   if (typeof child !== 'object') {
     return 1
   }
-  if (!('props' in child)) {
-    return child.reduce<number>((sum, c) => sum + countPanels(c), 0)
+  if (isList(child)) {
+    let sum = 0
+    for (const c of child) {
+      sum += countPanels(c)
+    }
+    return sum
   }
   const inner = countPanels(child.props.children)
   return child.type === 'fragment' ? inner : 1 + (child.type === 'label' ? 0 : inner)
@@ -133,10 +142,13 @@ function Queue(props: { draft: Draft; side: number }) {
   const { turn } = draft
   const taken = draft.order.slice(Math.max(0, turn - side), turn)
   const next = draft.order.slice(turn + 1, turn + 1 + side)
-  const current = draft.order[turn]
+  const current = draft.seats[draft.order[turn] ?? NO_SEAT]
   const enter = { translate: [TURN_WIDTH, 0] }
   const face = (seatIndex: number, at: number) => {
     const drafter = draft.seats[seatIndex]
+    if (!drafter) {
+      return null
+    }
     return (
       <Face
         key={at}
@@ -169,21 +181,21 @@ function Queue(props: { draft: Draft; side: number }) {
           borderWidth: 2, borderColor: Color.TurnRed, background: Color.TurnRedFill, overflow: 'show',
         }}
       >
-        {current === undefined ? null : (
+        {current ? (
           <panel
             key={`now${turn}`}
             style={{ width: '100%', height: '100%', overflow: 'show', transition: SLIDE_SECONDS }}
             enter={enter}
           >
             <Face
-              seat={draft.seats[current]}
+              seat={current}
               style={{
                 width: FACE_SIZE - 4, height: FACE_SIZE - 4,
                 horizontalAlign: 'center', verticalAlign: 'center', borderRadius: 4,
               }}
             />
           </panel>
-        )}
+        ) : null}
       </panel>
       <panel style={{ width: 'fill', height: '100%', overflow: 'show' }}>
         <panel
@@ -200,7 +212,7 @@ function Queue(props: { draft: Draft; side: number }) {
 
 function Face(props: { seat: Seat; style: SizedStyle }) {
   const { seat, style } = props
-  if (seat.hero !== undefined) {
+  if (seat.hero) {
     return <image src={seat.hero.portrait} style={style} />
   }
   if (seat.steamId !== undefined && seat.steamId !== 0n) {
@@ -268,15 +280,15 @@ function SeatCard(props: { seat: Seat; active: boolean; ready: boolean }) {
         borderWidth: 2, borderColor: active ? Color.TurnRed : Color.TurnRedClear,
       }}
     >
-      {seat.hero === undefined
-        ? <QuestionMark style={{ ...SEAT_CARD, borderWidth: 2, borderColor: Color.Edge }} size={30} />
-        : <image src={heroCard(seat.hero)} style={SEAT_CARD} />}
+      {seat.hero
+        ? <image src={heroCard(seat.hero)} style={SEAT_CARD} />
+        : <QuestionMark style={{ ...SEAT_CARD, borderWidth: 2, borderColor: Color.Edge }} size={30} />}
       <panel style={{ width: 'fill', flow: 'down', margin: [0, 0, 0, 8] }}>
-        {seat.hero === undefined ? null : (
+        {seat.hero ? (
           <label style={{ fontSize: 14, bold: true, uppercase: true, color: teamColor(seat.team) }}>
             {seat.hero.title}
           </label>
-        )}
+        ) : null}
         <label style={{ fontSize: 13, color: seat.away ? Color.Muted : Color.Text }}>{seat.name + tag}</label>
         <panel style={{ flow: 'right', margin: [4, 0, 0, 0] }}>
           {seat.picks.map((ability, slot) => (
@@ -288,12 +300,12 @@ function SeatCard(props: { seat: Seat; active: boolean; ready: boolean }) {
   )
 }
 
-function Slot(props: { ability: PoolAbility | undefined; ultimate: boolean }) {
+function Slot(props: { ability: Nullable<PoolAbility>; ultimate: boolean }) {
   const style = {
     width: 32, height: 32, margin: [0, 5, 0, 0], borderRadius: 4,
     background: Color.Well, borderWidth: 2, borderColor: props.ultimate ? Color.Ultimate : Color.Edge,
   }
-  if (props.ability !== undefined) {
+  if (props.ability) {
     return <image src={props.ability.icon} style={style} />
   }
   return <panel style={style} />
@@ -310,7 +322,7 @@ function Status(props: BoardProps) {
   let color = Color.Text
   if (!timed) {
     status = Word.Preparing
-  } else if (seat !== undefined) {
+  } else if (seat) {
     status = current === mySeat ? Word.YourTurn : `${Word.Picking}: ${seat.name}`
     color = current === mySeat ? Color.TurnRed : teamColor(seat.team)
   }
@@ -395,6 +407,9 @@ function HeroGroup(props: HeroGroupProps) {
   const { heroIndex, ...board } = props
   const { draft, mySeat, view } = board
   const hero = draft.board[heroIndex]
+  if (!hero) {
+    return null
+  }
   const owner = draft.heroTaker(hero)
   const spot: Spot = { heroIndex, column: HERO_COLUMN }
   const allowed = draft.mayTake(mySeat, spot)
@@ -442,8 +457,10 @@ function HeroGroup(props: HeroGroupProps) {
 function AbilityButton(props: AbilityButtonProps) {
   const { draft, mySeat, view, spot } = props
   const size = props.size ?? ICON_SIZE
-  const hero = draft.board[spot.heroIndex]
-  const ability = hero.abilities[spot.column]
+  const ability = draft.board[spot.heroIndex]?.abilities[spot.column]
+  if (!ability) {
+    return null
+  }
   const taker = draft.abilityTaker(ability)
   const allowed = draft.mayTake(mySeat, spot)
   const ultimate = spot.column === AbilitySlot.Ultimate

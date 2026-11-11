@@ -1,8 +1,8 @@
 import { type Player, uiSound } from 'modlock'
 
-import { type Draft, Phase } from '../draft/draft'
-import { connectedPeople, playerAt } from '../match/roster'
-import { COUNTDOWN_SECONDS, SCROLL_SECONDS, Sound } from './sounds'
+import { type Draft, Phase } from '@draft'
+import { connectedPeople, playerAt } from '@match'
+import { COUNTDOWN_SECONDS, SCROLL_SECONDS, Sound } from '@ui/sounds'
 
 export class Cues {
   private heardPicks = 0
@@ -31,7 +31,7 @@ export class Cues {
       return
     }
     const seat = draft.currentSeat()
-    const drafter = seat === undefined || seat.bot || seat.away ? undefined : playerAt(seat.slot)
+    const drafter = !seat || seat.bot || seat.away ? undefined : playerAt(seat.slot)
     this.playTurnStart(draft.turn, drafter)
     this.playCountdown(draft, now, drafter)
   }
@@ -39,15 +39,15 @@ export class Cues {
   private playPicks(draft: Draft): void {
     for (const taken of draft.history.slice(this.heardPicks)) {
       const seat = draft.seats[taken.seat]
-      const picker = seat === undefined || seat.bot ? undefined : playerAt(seat.slot)
-      if (picker !== undefined) {
-        this.play(picker, taken.hero !== undefined ? Sound.OwnHero : Sound.OwnAbility)
+      const picker = !seat || seat.bot ? undefined : playerAt(seat.slot)
+      if (picker) {
+        this.play(picker, taken.hero ? Sound.OwnHero : Sound.OwnAbility)
       }
     }
     this.heardPicks = draft.history.length
   }
 
-  private playTurnStart(turn: number, drafter: Player | undefined): void {
+  private playTurnStart(turn: number, drafter: Optional<Player>): void {
     if (turn === this.heardTurn) {
       return
     }
@@ -56,15 +56,15 @@ export class Cues {
       this.toAll(Sound.Scroll, SCROLL_SECONDS)
     }
     this.heardTurn = turn
-    if (drafter !== undefined) {
+    if (drafter) {
       this.play(drafter, Sound.YourTurn)
     }
   }
 
-  private playCountdown(draft: Draft, now: number, drafter: Player | undefined): void {
+  private playCountdown(draft: Draft, now: number, drafter: Optional<Player>): void {
     const left = draft.secondsLeft(now)
     const tick = `${draft.turn}:${left}`
-    if (drafter !== undefined && left >= 1 && left <= COUNTDOWN_SECONDS && this.ticked !== tick) {
+    if (drafter && left >= 1 && left <= COUNTDOWN_SECONDS && this.ticked !== tick) {
       this.ticked = tick
       this.play(drafter, Sound.Tick)
     }

@@ -1,9 +1,8 @@
 import { type Ability, type Connection, type Pawn, type Player, players, readField } from 'modlock'
 
-import { AbilitySlot } from '../draft/slots'
-import { isTeam } from '../draft/teams'
+import { AbilitySlot, isTeam } from '@draft'
 
-export function playerAt(slot: number): Player | undefined {
+export function playerAt(slot: number): Optional<Player> {
   return players().find((c) => c.player.slot === slot)?.player
 }
 
@@ -11,7 +10,7 @@ export function connectedPeople(): Connection[] {
   return players().filter((c) => c.ready && !c.bot)
 }
 
-export function controllerOf(pawn: number): number | undefined {
+export function controllerOf(pawn: number): Optional<number> {
   const controller = readField(pawn, 'CBasePlayerPawn', 'm_hController', 'handle')
   return typeof controller === 'number' ? controller : undefined
 }
@@ -42,7 +41,7 @@ export class HeroReads {
    * Reads the next player's hero, or forgets the player while they have none on
    * a team. Answers the read, and whether what it shows differs from the last.
    */
-  readNext(): { read: HeroRead; changed: boolean } | undefined {
+  readNext(): Optional<{ read: HeroRead; changed: boolean }> {
     const all = players()
     for (const slot of this.kept.keys()) {
       if (!all.some((c) => c.player.slot === slot)) {
@@ -50,24 +49,24 @@ export class HeroReads {
       }
     }
     const later = all.filter((c) => c.player.slot > this.lastSlot)
-    const connection = (later.length > 0 ? later : all).reduce<Connection | undefined>(
-      (first, c) => (first === undefined || c.player.slot < first.player.slot ? c : first),
+    const connection = (later.length > 0 ? later : all).reduce<Optional<Connection>>(
+      (first, c) => (!first || c.player.slot < first.player.slot ? c : first),
       undefined,
     )
-    if (connection === undefined) {
+    if (!connection) {
       return undefined
     }
     const slot = connection.player.slot
     this.lastSlot = slot
     const pawn = connection.ready ? connection.player.pawn() : undefined
-    if (pawn === undefined || !isTeam(pawn.team)) {
+    if (!pawn || !isTeam(pawn.team)) {
       this.kept.delete(slot)
       return undefined
     }
     const read: HeroRead = { connection, pawn, owned: connection.player.abilities() }
     const before = this.kept.get(slot)
     this.kept.set(slot, read)
-    return { read, changed: before === undefined || shown(before) !== shown(read) }
+    return { read, changed: !before || shown(before) !== shown(read) }
   }
 
   /** The kept reads by player slot, each at most a round of the players old. */

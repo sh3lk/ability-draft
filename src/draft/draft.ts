@@ -1,7 +1,8 @@
-import { drafted, type PoolAbility, type PoolHero, poolHeroes } from './pool'
-import { shuffled } from './shuffled'
-import { ABILITY_SLOTS, AbilitySlot } from './slots'
-import { Team } from './teams'
+import { drafted, type PoolAbility, type PoolHero, poolHeroes } from '@draft/pool'
+import { random } from '@draft/random'
+import { shuffled } from '@draft/shuffled'
+import { ABILITY_SLOTS, AbilitySlot } from '@draft/slots'
+import { Team } from '@draft/teams'
 
 /** The board column after the abilities' columns, which AbilitySlot numbers. */
 export const HERO_COLUMN = 4
@@ -30,7 +31,7 @@ export interface Seat extends Entrant {
   /** Drafted from the board, or what a late seat plays. */
   hero?: PoolHero
   /** By AbilitySlot. */
-  picks: (PoolAbility | undefined)[]
+  picks: Nullable<PoolAbility>[]
   /** The player left; the draft then picks for them at once. */
   away: boolean
 }
@@ -89,7 +90,7 @@ export class Draft {
   constructor(entrants: readonly Entrant[], board: readonly PoolHero[], now: number) {
     this.seats = shuffled(entrants).map((entrant) => ({
       ...entrant,
-      picks: ABILITY_SLOTS.map(() => undefined),
+      picks: ABILITY_SLOTS.map((): Nullable<PoolAbility> => null),
       away: false,
     }))
     this.board = [...board]
@@ -99,7 +100,7 @@ export class Draft {
 
   /** The index of the seat on turn, or NO_SEAT outside picking. */
   current(): number {
-    return this.phase === Phase.Picking ? this.order[this.turn] : NO_SEAT
+    return this.phase === Phase.Picking ? (this.order[this.turn] ?? NO_SEAT) : NO_SEAT
   }
 
   /** NO_SEAT when the player has no seat. */
@@ -107,7 +108,7 @@ export class Draft {
     return this.seats.findIndex((s) => s.slot === slot)
   }
 
-  seatAt(slot: number): Seat | undefined {
+  seatAt(slot: number): Optional<Seat> {
     return this.seats.find((s) => s.slot === slot)
   }
 
@@ -115,26 +116,26 @@ export class Draft {
     return Math.max(0, Math.ceil(this.deadline - now))
   }
 
-  currentSeat(): Seat | undefined {
+  currentSeat(): Optional<Seat> {
     return this.seats[this.current()]
   }
 
-  abilityTaker(ability: PoolAbility): Seat | undefined {
+  abilityTaker(ability: PoolAbility): Optional<Seat> {
     return this.abilityTakers.get(ability.name)
   }
 
-  heroTaker(hero: PoolHero): Seat | undefined {
+  heroTaker(hero: PoolHero): Optional<Seat> {
     return this.heroTakers.get(hero.name)
   }
 
   mayTake(seatIndex: number, spot: Spot): boolean {
     const drafter = this.seats[seatIndex]
     const hero = this.board[spot.heroIndex]
-    if (drafter === undefined || hero === undefined) {
+    if (!drafter || !hero) {
       return false
     }
     if (spot.column === HERO_COLUMN) {
-      return !this.heroTakers.has(hero.name) && drafter.hero === undefined
+      return !this.heroTakers.has(hero.name) && !drafter.hero
     }
     const ability = hero.abilities[spot.column]
     return ability !== undefined && drafted(ability) && !this.abilityTakers.has(ability.name) &&
@@ -160,12 +161,18 @@ export class Draft {
     }
     const drafter = this.seats[seatIndex]
     const hero = this.board[spot.heroIndex]
+    if (!drafter || !hero) {
+      return false
+    }
     if (spot.column === HERO_COLUMN) {
       drafter.hero = hero
       this.heroTakers.set(hero.name, drafter)
       this.history.push({ seat: seatIndex, hero })
     } else {
       const ability = hero.abilities[spot.column]
+      if (!ability) {
+        return false
+      }
       drafter.picks[freeSlot(drafter, spot.column)] = ability
       this.abilityTakers.set(ability.name, drafter)
       this.history.push({ seat: seatIndex })
@@ -181,7 +188,7 @@ export class Draft {
    */
   ping(seatIndex: number, spot: Spot): boolean {
     const last = this.pings.get(seatIndex)
-    if (last !== undefined && last.heroIndex === spot.heroIndex && last.column === spot.column) {
+    if (last && last.heroIndex === spot.heroIndex && last.column === spot.column) {
       this.pings.delete(seatIndex)
       return true
     }
@@ -209,16 +216,17 @@ export class Draft {
   pickRandom(now: number): void {
     const seat = this.current()
     const own = this.pings.get(seat)
-    if (own !== undefined && this.pick(seat, own, now)) {
+    if (own && this.pick(seat, own, now)) {
       return
     }
     const drafter = this.seats[seat]
     const spots = this.choices(seat)
-    const unpinged = drafter === undefined ? spots : spots.filter((spot) =>
-      this.pingersOf(spot, drafter.team).every((pinger) => pinger === drafter))
+    const unpinged = drafter
+      ? spots.filter((spot) => this.pingersOf(spot, drafter.team).every((pinger) => pinger === drafter))
+      : spots
     const from = unpinged.length > 0 ? unpinged : spots
-    const spot = from[Math.floor(Math.random() * from.length)]
-    if (spot === undefined || !this.pick(seat, spot, now)) {
+    const spot = from[Math.floor(random() * from.length)]
+    if (!spot || !this.pick(seat, spot, now)) {
       // No allowed pick is left: the pool ran dry, so the turn passes.
       this.next(now)
     }
@@ -243,7 +251,7 @@ export class Draft {
 
   private turnSeconds(): number {
     const seat = this.seats[this.current()]
-    return seat.bot || seat.away ? BOT_SECONDS : PICK_SECONDS
+    return !seat || seat.bot || seat.away ? BOT_SECONDS : PICK_SECONDS
   }
 
   private next(now: number): void {
@@ -259,7 +267,7 @@ export class Draft {
   leave(slot: number, now: number): void {
     const index = this.seatIndexOf(slot)
     const seat = this.seats[index]
-    if (seat === undefined || seat.away) {
+    if (!seat || seat.away) {
       return
     }
     seat.away = true
@@ -274,7 +282,7 @@ export class Draft {
   rejoin(slot: number, now: number): void {
     const index = this.seatIndexOf(slot)
     const seat = this.seats[index]
-    if (seat === undefined || !seat.away) {
+    if (!seat || !seat.away) {
       return
     }
     seat.away = false
@@ -290,7 +298,7 @@ export class Draft {
  */
 function freeSlot(seat: Seat, column: AbilitySlot): number {
   const ultimate = column === AbilitySlot.Ultimate
-  return seat.picks.findIndex((pick, slot) => pick === undefined && (slot === AbilitySlot.Ultimate) === ultimate)
+  return seat.picks.findIndex((pick, slot) => !pick && (slot === AbilitySlot.Ultimate) === ultimate)
 }
 
 /**
@@ -301,12 +309,13 @@ function snakeOrder(seats: readonly Seat[]): number[] {
   const indexesOn = (team: Team) => seats.flatMap((seat, index) => (seat.team === team ? [index] : []))
   const hiddenKing = indexesOn(Team.HiddenKing)
   const archmother = indexesOn(Team.Archmother)
-  const teams = Math.random() < 0.5 ? [hiddenKing, archmother] : [archmother, hiddenKing]
+  const teams = random() < 0.5 ? [hiddenKing, archmother] : [archmother, hiddenKing]
   const round: number[] = []
   for (let i = 0; i < Math.max(hiddenKing.length, archmother.length); i++) {
     for (const team of teams) {
-      if (i < team.length) {
-        round.push(team[i])
+      const index = team[i]
+      if (index !== undefined) {
+        round.push(index)
       }
     }
   }

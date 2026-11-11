@@ -1,8 +1,9 @@
+/// <reference path="./globals.d.ts" />
 import { command, onFrame, onStart, onWorld, precache } from 'modlock'
 
-import { switchOnBroker } from './src/broker/broker'
-import { poolHeroes } from './src/draft/pool'
-import { Flow } from './src/flow'
+import { switchOnBroker } from '@broker'
+import { poolHeroes } from '@draft'
+import { Flow } from '@flow'
 
 const flow = new Flow()
 

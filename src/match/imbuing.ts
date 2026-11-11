@@ -1,6 +1,6 @@
 import { item, log, type Player } from 'modlock'
 
-import { ABILITY_SLOTS } from '../draft/slots'
+import { ABILITY_SLOTS } from '@draft'
 
 /**
  * Buys an imbuing item for the game's own buydependentitem, which the mod

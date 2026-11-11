@@ -1,6 +1,6 @@
 import { type Ability, item, log } from 'modlock'
 
-import type { HeroRead } from '../match/roster'
+import type { HeroRead } from '@match'
 
 /** The upgrade bit the game sets on a corrupted item. */
 const CORRUPTED_BIT = 0x80

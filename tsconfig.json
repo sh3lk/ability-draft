@@ -8,9 +8,23 @@
     "jsx": "react-jsx",
     "jsxImportSource": "modlock",
     "strict": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@broker": ["./src/broker/index.ts"],
+      "@broker/*": ["./src/broker/*"],
+      "@draft": ["./src/draft/index.ts"],
+      "@draft/*": ["./src/draft/*"],
+      "@lobby": ["./src/lobby/index.ts"],
+      "@lobby/*": ["./src/lobby/*"],
+      "@match": ["./src/match/index.ts"],
+      "@match/*": ["./src/match/*"],
+      "@ui": ["./src/ui/index.ts"],
+      "@ui/*": ["./src/ui/*"],
+      "@flow": ["./src/flow.ts"]
+    }
   },
   "exclude": ["build", "node_modules"]
 }
